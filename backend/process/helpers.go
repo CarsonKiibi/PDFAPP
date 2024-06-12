@@ -90,3 +90,28 @@ func HandleBulletStart(command string) Token {
 func HandleBulletChildren(command string) Token {
 	return Token{}
 }
+
+func HandleOpenBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+	if inBraces {
+		tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "{", Attributes: TokenAttributes{ErrorAt: i, Error: fmt.Errorf("illegal nesting")}})
+	} else {
+		if len(word) > 0 {
+			tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
+			word = []rune{}
+		}
+		inBraces = true
+		word = append(word, '{')
+	}
+	return tokens, word, inBraces
+}
+
+func HandleCloseBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+	if inBraces {
+		tokens = append(tokens, HandleTextModifier(string(word[1:]))...)
+		word = []rune{}
+		inBraces = false
+	} else {
+		tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "}", Attributes: TokenAttributes{ErrorAt: i}})
+	}
+	return tokens, word, inBraces
+}

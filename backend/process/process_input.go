@@ -8,24 +8,9 @@ func ProcessInput(sentence string) []Token {
 	for i, char := range sentence {
 		switch char {
 		case '{':
-			if inBraces {
-				tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "{", Attributes: TokenAttributes{ErrorAt: i}})
-			} else {
-				if len(word) > 0 {
-					tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
-					word = []rune{}
-				}
-				inBraces = true
-				word = append(word, char)
-			}
+			tokens, word, inBraces = HandleOpenBrace(inBraces, word, tokens, i)
 		case '}':
-			if inBraces {
-				tokens = append(tokens, HandleTextModifier(string(word[1:]))...)
-				word = []rune{}
-				inBraces = false
-			} else {
-				tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "}", Attributes: TokenAttributes{ErrorAt: i}})
-			}
+			tokens, word, inBraces = HandleCloseBrace(inBraces, word, tokens, i)
 		default:
 			word = append(word, char)
 		}

@@ -9,7 +9,7 @@ import (
 
 func main() {
 	start := time.Now()
-	str := "I like {B,S14:apples}"
+	str := "I like {{B,S14:apples}"
 	out := process.ProcessInput(str)
 	for _, token := range out {
 		fmt.Println(token)
