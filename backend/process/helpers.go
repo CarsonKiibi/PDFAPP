@@ -91,21 +91,18 @@ func HandleBulletChildren(command string) Token {
 	return Token{}
 }
 
-func HandleOpenBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
-	if inBraces {
-		tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "{", Attributes: TokenAttributes{ErrorAt: i, Error: fmt.Errorf("illegal nesting")}})
-	} else {
-		if len(word) > 0 {
-			tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
-			word = []rune{}
-		}
-		inBraces = true
-		word = append(word, '{')
+func HandleOpenCurlyBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+
+	if len(word) > 0 {
+		tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
+		word = []rune{}
 	}
+	inBraces = true
+	word = append(word, '{')
 	return tokens, word, inBraces
 }
 
-func HandleCloseBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+func HandleClosedCurlyBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
 	if inBraces {
 		tokens = append(tokens, HandleTextModifier(string(word[1:]))...)
 		word = []rune{}
@@ -114,4 +111,29 @@ func HandleCloseBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Toke
 		tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "}", Attributes: TokenAttributes{ErrorAt: i}})
 	}
 	return tokens, word, inBraces
+}
+
+func HandleOpenSquareBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+	if len(word) > 0 {
+		tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
+		word = []rune{}
+	}
+	inBraces = true
+	word = append(word, '{')
+	return tokens, word, inBraces
+}
+
+func HandleClosedSquareBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
+	if inBraces {
+		tokens = append(tokens, HandleTextModifier(string(word[1:]))...)
+		word = []rune{}
+		inBraces = false
+	} else {
+		tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "}", Attributes: TokenAttributes{ErrorAt: i}})
+	}
+	return tokens, word, inBraces
+}
+
+func IsNestedError(inCBraces bool, inSBraces bool, char string) bool {
+	return (inCBraces || inSBraces) && (string(char) == "{" || string(char) == "[")
 }
