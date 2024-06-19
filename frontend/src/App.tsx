@@ -14,7 +14,7 @@ interface TokenError {
 }
 
 function App() {
-  const [text, setText] = useState<string>("My name is {Bob} and I like {Shiny Green Apples}");
+  const [text, setText] = useState<string>("Text input");
   const [errors, setErrors] = useState<TokenError[]>([]);
 
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {

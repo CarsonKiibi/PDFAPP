@@ -1,34 +1,53 @@
 package process
 
-import "fmt"
+import (
+	"fmt"
 
-func ProcessInput(sentence string) []Token {
-	var tokens []Token
+	"github.com/carsonkiibi/pdfapp/backend/process/commands"
+)
+
+func ProcessInput(sentence string) []commands.Token {
+	var tokens []commands.Token
 	var word []rune
 	inCBraces := false
 	inSBraces := false
 
 	for i, char := range sentence {
-		if IsNestedError(inCBraces, inSBraces, string(char)) {
-			tokens = append(tokens, Token{Type: ErrorIllegalNesting, Literal: "baba", Attributes: TokenAttributes{ErrorAt: i, Error: fmt.Errorf("illegal nesting")}})
+		if commands.IsNestedError(inCBraces, inSBraces, string(char)) {
+			tokens = append(
+				tokens,
+				commands.Token{
+					Type:    commands.ErrorIllegalNesting,
+					Literal: string(char),
+					Attributes: commands.TokenAttributes{
+						ErrorAt: i,
+						Error:   fmt.Errorf("illegal nesting"),
+					},
+				},
+			)
+
+			break
 		}
 		switch char {
 		case '{':
 			// need to handle nested error here
-			tokens, word, inCBraces = HandleOpenCurlyBrace(inCBraces, word, tokens, i)
+			tokens, word, inCBraces = commands.HandleOpenCurlyBrace(inCBraces, word, tokens, i)
 		case '}':
-			tokens, word, inCBraces = HandleClosedCurlyBrace(inCBraces, word, tokens, i)
+			tokens, word, inCBraces = commands.HandleClosedCurlyBrace(inCBraces, word, tokens, i)
 		case '[':
-			tokens, word, inSBraces = HandleOpenSquareBrace(inSBraces, word, tokens, i)
+			tokens, word, inSBraces = commands.HandleOpenSquareBrace(inSBraces, word, tokens, i)
 		case ']':
-			tokens, word, inSBraces = HandleClosedSquareBrace(inSBraces, word, tokens, i)
+			tokens, word, inSBraces = commands.HandleClosedSquareBrace(inSBraces, word, tokens, i)
 		default:
 			word = append(word, char)
 		}
 	}
 
 	if len(word) > 0 {
-		tokens = append(tokens, Token{Type: TokenText, Literal: string(word)})
+		tokens = append(tokens,
+			commands.Token{
+				Type:    commands.TokenText,
+				Literal: string(word)})
 	}
 
 	return tokens

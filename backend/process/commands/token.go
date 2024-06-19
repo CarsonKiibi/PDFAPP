@@ -1,4 +1,4 @@
-package process
+package commands
 
 type TokenType string
 type ErrorType string
