@@ -14,7 +14,18 @@ func ProcessInput(sentence string) []commands.Token {
 
 	for i, char := range sentence {
 		if commands.IsNestedError(inCBraces, inSBraces, string(char)) {
-			tokens = append(tokens, commands.Token{Type: commands.ErrorIllegalNesting, Literal: string(char), Attributes: commands.TokenAttributes{ErrorAt: i, Error: fmt.Errorf("illegal nesting")}})
+			tokens = append(
+				tokens,
+				commands.Token{
+					Type:    commands.ErrorIllegalNesting,
+					Literal: string(char),
+					Attributes: commands.TokenAttributes{
+						ErrorAt: i,
+						Error:   fmt.Errorf("illegal nesting"),
+					},
+				},
+			)
+
 			break
 		}
 		switch char {
@@ -33,7 +44,10 @@ func ProcessInput(sentence string) []commands.Token {
 	}
 
 	if len(word) > 0 {
-		tokens = append(tokens, commands.Token{Type: commands.TokenText, Literal: string(word)})
+		tokens = append(tokens,
+			commands.Token{
+				Type:    commands.TokenText,
+				Literal: string(word)})
 	}
 
 	return tokens

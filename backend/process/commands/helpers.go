@@ -1,31 +1,5 @@
 package commands
 
-// ignores the command following the symbol, returns token as just text
-func HandleIgnoreCommand(command string) Token {
-	return Token{}
-}
-
-// todo
-func HandleDocumentSpacing(input string) []Token {
-	dir, size, err := SplitTextModifier(input)
-	if err != nil {
-		return []Token{{Attributes: TokenAttributes{Error: err}}}
-	}
-
-	if len(dir) != 1 {
-		return []Token{{Literal: size, Attributes: TokenAttributes{}}}
-	}
-	return []Token{{Literal: size, Attributes: TokenAttributes{}}}
-}
-
-func HandleBulletStart(command string) Token {
-	return Token{}
-}
-
-func HandleBulletChildren(command string) Token {
-	return Token{}
-}
-
 func HandleOpenCurlyBrace(inBraces bool, word []rune, tokens []Token, i int) ([]Token, []rune, bool) {
 
 	if len(word) > 0 {
