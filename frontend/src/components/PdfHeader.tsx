@@ -1,11 +1,15 @@
 import React from 'react';
 
-const PdfHeader: React.FC = () => {
+interface PdfHeaderProps {
+    onCompile: () => void;
+}
+
+const PdfHeader: React.FC<PdfHeaderProps> = ({ onCompile }) => {
     return (
         <div className="navbar bg-base-100 rounded-t-xl">
-            <a className="btn btn-ghost bg-main-accent text-main-background ml-2">Compile</a>
+            <button onClick={onCompile}>Compile</button>
         </div>
     );
-}
+};
 
 export default PdfHeader;

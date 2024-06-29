@@ -20,49 +20,72 @@
             display: flex;
             flex-direction: column;
         }
+
+        #inputForm {
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 
 <body>
+    <form id="inputForm">
+        <textarea id="textInput" rows="4" cols="50" placeholder="Enter text here..."></textarea>
+        <br>
+        <button type="submit">Submit</button>
+    </form>
     <div id="pdfViewer"></div>
 
     <script>
-        const url = 'http://localhost:8080/pdf';
+        const form = document.getElementById('inputForm');
+        const textInput = document.getElementById('textInput');
 
-        fetch(url)
-            .then(response => response.blob())
-            .then(blob => {
-                const fileReader = new FileReader();
-                fileReader.onload = function () {
-                    const typedarray = new Uint8Array(this.result);
+        form.addEventListener('submit', function (event) {
+            event.preventDefault();
 
-                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
-                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                            pdf.getPage(pageNum).then(page => {
-                                const scale = 2.0;
-                                const viewport = page.getViewport({ scale });
+            const url = 'http://localhost:8080/pdf';
+            const text = textInput.value;
 
-                                const canvas = document.createElement('canvas');
-                                canvas.className = 'pdfPage';
-                                const context = canvas.getContext('2d');
-                                canvas.height = viewport.height;
-                                canvas.width = viewport.width;
-
-                                const renderContext = {
-                                    canvasContext: context,
-                                    viewport: viewport
-                                };
-
-                                page.render(renderContext).promise.then(() => {
-                                    document.getElementById('pdfViewer').appendChild(canvas);
-                                });
-                            });
-                        }
-                    });
-                };
-                fileReader.readAsArrayBuffer(blob);
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text })
             })
-            .catch(error => console.error('Error fetching PDF:', error));
+                .then(response => response.blob())
+                .then(blob => {
+                    const fileReader = new FileReader();
+                    fileReader.onload = function () {
+                        const typedarray = new Uint8Array(this.result);
+
+                        pdfjsLib.getDocument(typedarray).promise.then(pdf => {
+                            document.getElementById('pdfViewer').innerHTML = ''; // Clear previous PDF
+
+                            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                                pdf.getPage(pageNum).then(page => {
+                                    const scale = 5.0;
+                                    const viewport = page.getViewport({ scale });
+
+                                    const canvas = document.createElement('canvas');
+                                    canvas.className = 'pdfPage';
+                                    const context = canvas.getContext('2d');
+                                    canvas.height = viewport.height;
+                                    canvas.width = viewport.width;
+
+                                    const renderContext = {
+                                        canvasContext: context,
+                                        viewport: viewport
+                                    };
+
+                                    page.render(renderContext).promise.then(() => {
+                                        document.getElementById('pdfViewer').appendChild(canvas);
+                                    });
+                                });
+                            }
+                        });
+                    };
+                    fileReader.readAsArrayBuffer(blob);
+                })
+                .catch(error => console.error('Error fetching PDF:', error));
+        });
     </script>
 </body>
 

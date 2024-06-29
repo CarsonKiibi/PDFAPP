@@ -2,10 +2,10 @@ import React, { useState, ChangeEvent } from 'react';
 import './App.css';
 import Sidebar from './components/Sidebar';
 import MasterHeader from './components/MasterHeader';
-import DocContainer from './components/DocContainer';
 import EditHeader from './components/EditHeader';
 import PdfHeader from './components/PdfHeader';
 import TextAreaWithLineNumbers from './components/TextAreaWithLineNumbers';
+import DisplayPDF from './components/DisplayPDF';
 
 interface TokenError {
   line: number;
@@ -16,13 +16,13 @@ interface TokenError {
 function App() {
   const [text, setText] = useState<string>("Text input");
   const [errors, setErrors] = useState<TokenError[]>([]);
+  const [showPDF, setShowPDF] = useState<boolean>(false);
 
   const handleTextChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleCompile = async () => {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -33,6 +33,7 @@ function App() {
       setErrors(result.errors);
     } else {
       setErrors([]);
+      setShowPDF(true);
     }
   };
 
@@ -46,8 +47,8 @@ function App() {
         </div>
 
         <div className="flex flex-col w-full mx-3 flex-1 overflow-hidden">
-          <PdfHeader />
-          <DocContainer />
+          <PdfHeader onCompile={handleCompile} />
+          {showPDF ? <DisplayPDF /> : <div className="doc-container" />}
         </div>
       </div>
     </div>
@@ -55,4 +56,5 @@ function App() {
 }
 
 export default App;
+
 
