@@ -30,6 +30,10 @@ const (
 	TokenIllegalNoParent  TokenType = "ILL_NO_PARENT"
 )
 
+// Every successfully created token will have a type and a literal
+// Many and sometimes all TokenAttributes may be nil
+// Failed token can have all nil values including type and literal but have TokenAttributes{Error} non-nil
+
 type Token struct {
 	Type       TokenType
 	Literal    string

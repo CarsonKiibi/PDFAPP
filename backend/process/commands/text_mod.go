@@ -7,7 +7,14 @@ import (
 	"strings"
 )
 
-// create token bold, italic, underline, size attributes to token and return
+// Creates token based on text mods (Bold, Italicize, Underline, Text Size)
+// SUCCESS: returns token with type, literal, and one or both of updated attributes (bold, italicize, underline)
+// and size
+// FAIL: can return token with same parts of success but will return it with Attribute{Error} non-nil
+
+// todo: need global for text size!!!
+// maybe colour? Dunno how to handle that tho
+
 func HandleTextModifier(command string) []Token {
 	mods, content, err := SplitTextModifier(command)
 	if err != nil {

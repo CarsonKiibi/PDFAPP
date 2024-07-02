@@ -6,6 +6,7 @@ import (
 	"unicode"
 )
 
+// Removes spaces and returns modified string
 func RemoveSpaces(input string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsSpace(r) {
@@ -17,6 +18,9 @@ func RemoveSpaces(input string) string {
 	}, input)
 }
 
+// Splits text across first instance of colon (:) 
+// SUCCESS: return content split into beginning and end, nil error
+// FAIL: returns input as first string (beginning), "" as end, and error
 func SplitTextModifier(input string) (string, string, error) {
 	// set index to first occurrence of :
 	index := strings.Index(input, ":")
