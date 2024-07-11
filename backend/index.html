@@ -4,66 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Display PDF</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-    <style>
-        .pdfPage {
-            margin-bottom: 10px;
-            width: 75%;
-        }
-
-        body {
-            background-color: lightblue;
-        }
-
-        #pdfViewer {
-            display: flex;
-            flex-direction: column;
-        }
-    </style>
+    <title>Document</title>
+    <script src="https://unpkg.com/htmx.org@1.6.1/dist/htmx.min.js"></script>
 </head>
 
 <body>
-    <div id="pdfViewer"></div>
-
-    <script>
-        const url = 'http://localhost:8080/pdf';
-
-        fetch(url)
-            .then(response => response.blob())
-            .then(blob => {
-                const fileReader = new FileReader();
-                fileReader.onload = function () {
-                    const typedarray = new Uint8Array(this.result);
-
-                    pdfjsLib.getDocument(typedarray).promise.then(pdf => {
-                        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-                            pdf.getPage(pageNum).then(page => {
-                                const scale = 2.0;
-                                const viewport = page.getViewport({ scale });
-
-                                const canvas = document.createElement('canvas');
-                                canvas.className = 'pdfPage';
-                                const context = canvas.getContext('2d');
-                                canvas.height = viewport.height;
-                                canvas.width = viewport.width;
-
-                                const renderContext = {
-                                    canvasContext: context,
-                                    viewport: viewport
-                                };
-
-                                page.render(renderContext).promise.then(() => {
-                                    document.getElementById('pdfViewer').appendChild(canvas);
-                                });
-                            });
-                        }
-                    });
-                };
-                fileReader.readAsArrayBuffer(blob);
-            })
-            .catch(error => console.error('Error fetching PDF:', error));
-    </script>
+    <form id="pdf-form" hx-post="/pdf" hx-target="#pdf-container" hx-swap="innerHTML" method="post">
+        <label for="text-input">Enter text:</label>
+        <input type="text" id="text-input" name="text" required>
+        <button type="submit">Generate PDF</button>
+    </form>
+    <div id="pdf-container"></div>
 </body>
 
 </html>
