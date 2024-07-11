@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/carsonkiibi/pdfapp/backend/process/commands"
 )
@@ -14,9 +15,8 @@ type Position struct {
 }
 
 type Lexer struct {
-	pos     Position
-	nextPos Position
-	reader  *bufio.Reader
+	pos    Position
+	reader *bufio.Reader
 }
 
 func NewLexer(reader io.Reader) *Lexer {
@@ -34,7 +34,40 @@ func (l *Lexer) Lex() (Position, commands.Token, string) {
 				return l.pos, commands.Token{}, ""
 			}
 			panic(err)
-			fmt.Println(r)
+		}
+
+		if r == '{' {
+			content, err := l.lexTextMod()
+			if err != nil {
+				panic(err)
+			}
+			return l.pos, commands.Token{}, content
 		}
 	}
+}
+
+// need to test this
+func (l *Lexer) lexTextMod() (string, error) {
+	var sb strings.Builder
+	nestedBrackets := 0
+
+	for {
+		r, _, err := l.reader.ReadRune()
+		if err != nil {
+			return "", fmt.Errorf("unexpected EOF")
+		}
+
+		if r == '{' {
+			nestedBrackets++
+		} else if r == '}' {
+			if nestedBrackets > 0 {
+				return "", fmt.Errorf("nested curly brackets are not allowed")
+			}
+			break
+		}
+
+		sb.WriteRune(r)
+	}
+
+	return sb.String(), nil
 }
