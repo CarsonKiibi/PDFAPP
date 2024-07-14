@@ -1,4 +1,4 @@
-package process
+package main
 
 import (
 	"bufio"
@@ -31,7 +31,7 @@ func (l *Lexer) Lex() (Position, commands.Token, string) {
 		r, _, err := l.reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
-				return l.pos, commands.Token{}, ""
+				return l.pos, commands.Token{Literal: "end"}, ""
 			}
 			panic(err)
 		}
@@ -41,7 +41,7 @@ func (l *Lexer) Lex() (Position, commands.Token, string) {
 			if err != nil {
 				panic(err)
 			}
-			return l.pos, commands.Token{}, content
+			return l.pos, commands.Token{Literal: string(r)}, content
 		}
 	}
 }
@@ -49,7 +49,6 @@ func (l *Lexer) Lex() (Position, commands.Token, string) {
 // need to test this
 func (l *Lexer) lexTextMod() (string, error) {
 	var sb strings.Builder
-	nestedBrackets := 0
 
 	for {
 		r, _, err := l.reader.ReadRune()
@@ -57,17 +56,27 @@ func (l *Lexer) lexTextMod() (string, error) {
 			return "", fmt.Errorf("unexpected EOF")
 		}
 
-		if r == '{' {
-			nestedBrackets++
-		} else if r == '}' {
-			if nestedBrackets > 0 {
-				return "", fmt.Errorf("nested curly brackets are not allowed")
-			}
-			break
+		switch string(r) {
+		case "{", "}":
+			return string(r), nil
 		}
 
 		sb.WriteRune(r)
 	}
 
 	return sb.String(), nil
+}
+
+func main() {
+	input := "hello {hello} hello"
+	reader := strings.NewReader(input)
+	lexer := NewLexer(reader)
+	for {
+		pos, tok, lit := lexer.Lex()
+		if tok.Literal == "end" {
+			break
+		}
+
+		fmt.Printf("%d:%d | \t%s | \t%s | \n", pos.line, pos.column, tok.Literal, lit)
+	}
 }
