@@ -66,7 +66,9 @@ func (l *Lexer) Lex() (Position, Token, string) {
 		case '\n':
 			l.resetPosition()
 		case '{':
-			return l.pos, TEXT, "{"
+			startPos := l.pos
+			lit, tok := l.lexText(TEXTMOD)
+			return startPos, tok, lit 
 		case '}':
 			return l.pos, TEXT, "}"
 		case '[':
@@ -79,8 +81,8 @@ func (l *Lexer) Lex() (Position, Token, string) {
 			} else if unicode.IsLetter(r) || unicode.IsNumber(r) {
 				startPos := l.pos
 				l.backup()
-				lit := l.lexTextMod()
-				return startPos, TEXTMOD, lit 
+				lit, tok := l.lexText(TEXT)
+				return startPos, tok, lit
 			}
 		}
 	}
@@ -93,20 +95,32 @@ func (l *Lexer) resetPosition() {
 }
 
 // need to test this
-func (l *Lexer) lexTextMod() string {
+func (l *Lexer) lexText(tokenType int) (string, Token) {
 	var sb strings.Builder
 	for {
 		r, _, err := l.reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
-				return sb.String()
+				return sb.String(), EOF
 			}
 		}
 		l.pos.column++ 
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsSpace(r) {
 			sb.WriteRune(r)
-		} else {
-			return sb.String()
+		} else if tokenType == TEXTMOD {
+			if r == '{' {
+				return sb.String(), ILLEGALNEST
+			} else if r == '}' {
+				return sb.String(), TEXTMOD
+			} else {
+				sb.WriteRune(r)
+			}
+		} else if tokenType == TEXT {
+			if unicode.IsSpace(r) {
+				return sb.String(), TEXT
+			} else {
+				sb.WriteRune(r)
+			}
 		}
 	}
 }
@@ -120,7 +134,7 @@ func (l *Lexer) backup() {
 }
 
 func main() {
-	input := "tok1 { tok2 [ \n tok3"
+	input := "{hello} hello2"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 	for {
