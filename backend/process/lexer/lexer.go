@@ -76,14 +76,10 @@ func (l *Lexer) Lex() (Position, Token, string) {
 		case ']':
 			return l.pos, TEXT, "]"
 		default:
-			if unicode.IsSpace(r) {
-				continue
-			} else if unicode.IsLetter(r) || unicode.IsNumber(r) {
-				startPos := l.pos
-				l.backup()
-				lit, tok := l.lexText(TEXT)
-				return startPos, tok, lit
-			}
+			startPos := l.pos
+			l.backup()
+			lit, tok := l.lexText(TEXT)
+			return startPos, tok, lit
 		}
 	}
 	
@@ -103,9 +99,10 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 			if err == io.EOF {
 				return sb.String(), EOF
 			}
+			fmt.Println("err!")
 		}
 		l.pos.column++ 
-		if unicode.IsLetter(r) || unicode.IsNumber(r) || unicode.IsSpace(r) {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			sb.WriteRune(r)
 		} else if tokenType == TEXTMOD {
 			if r == '{' {
@@ -134,7 +131,7 @@ func (l *Lexer) backup() {
 }
 
 func main() {
-	input := "{hello} hello2"
+	input := "hellooo {hello} hello"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 	for {
