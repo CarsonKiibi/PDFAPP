@@ -72,9 +72,13 @@ func (l *Lexer) Lex() (Position, Token, string) {
 		case '}':
 			return l.pos, TEXT, "}"
 		case '[':
-			return l.pos, TEXT, "["
+			startPos := l.pos 
+			lit, tok := l.lexText(SPACING)
+			return startPos, tok, lit
 		case ']':
 			return l.pos, TEXT, "]"
+		case ' ':
+			return l.pos, TEXT, "_"
 		default:
 			startPos := l.pos
 			l.backup()
@@ -99,11 +103,12 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 			if err == io.EOF {
 				return sb.String(), EOF
 			}
-			fmt.Println("err!")
 		}
 		l.pos.column++ 
 		if unicode.IsLetter(r) || unicode.IsNumber(r) {
 			sb.WriteRune(r)
+
+		// TEXT MOD
 		} else if tokenType == TEXTMOD {
 			if r == '{' {
 				return sb.String(), ILLEGALNEST
@@ -112,8 +117,20 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 			} else {
 				sb.WriteRune(r)
 			}
+
+		// TEXT
+		} else if tokenType == SPACING {
+			if r == '[' {
+				return sb.String(), ILLEGALNEST 
+			} else if r == ']' {
+				return sb.String(), SPACING
+			} else {
+				sb.WriteRune(r)
+			}
+
 		} else if tokenType == TEXT {
 			if unicode.IsSpace(r) {
+				l.backup() // space between one and two doesnt show but after two does (when removed)
 				return sb.String(), TEXT
 			} else {
 				sb.WriteRune(r)
@@ -130,8 +147,13 @@ func (l *Lexer) backup() {
 	l.pos.column--
 }
 
+// maybe just pass some variable into lexText etc that makes it ignore stuff
+func (l *Lexer) ignoreNext() {
+	// ??
+}
+
 func main() {
-	input := "hellooo {hello} hello"
+	input := "text {mod}[spacing] second text text what what"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 	for {
