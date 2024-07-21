@@ -1,0 +1,92 @@
+package templates
+
+templ Index() {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+			<title>Code Compiler</title>
+			<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+			<script src="https://unpkg.com/monaco-editor@0.36.1/min/vs/loader.js"></script>
+			<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+			<style>
+				#editor { height: 400px; }
+				@media (min-width: 768px) { #editor { height: 600px; } }
+			</style>
+		</head>
+		<body class="bg-gray-100">
+			<div class="container mx-auto p-4">
+				<h1 class="text-3xl font-bold mb-4">Code Compiler</h1>
+				<div class="flex flex-col md:flex-row gap-4">
+					<div class="w-full md:w-1/2">
+						<div id="editor" class="border border-gray-300 rounded"></div>
+						<button
+							class="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+							hx-post="/compile"
+							hx-trigger="click"
+							hx-target="#output"
+							hx-indicator="#loading"
+							hx-swap="innerHTML"
+						>
+							Compile
+						</button>
+						<div id="loading" class="htmx-indicator mt-2">
+							Compiling...
+						</div>
+					</div>
+					<div class="w-full md:w-1/2">
+						<div id="output" class="border border-gray-300 rounded p-4 h-[400px] md:h-[600px] overflow-auto">
+							Output will appear here
+						</div>
+					</div>
+				</div>
+			</div>
+			<script>
+				require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.36.1/min/vs' } });
+				require(['vs/editor/editor.main'], function() {
+					var editor = monaco.editor.create(document.getElementById('editor'), {
+						value: '// Your code here',
+						language: 'plaintext',
+						theme: 'vs-light',
+						minimap: { enabled: false }
+					});
+
+					htmx.on('htmx:beforeRequest', function(evt) {
+						if (evt.detail.elt.getAttribute('hx-target') === '#output') {
+							evt.detail.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+							evt.detail.parameters.code = editor.getValue();
+						}
+					});
+
+					htmx.on('htmx:afterSwap', function(evt) {
+						if (evt.detail.target.id === 'output') {
+							var response = evt.detail.xhr.response;
+							try {
+								var jsonResponse = JSON.parse(response);
+								if (jsonResponse.line && jsonResponse.column) {
+									editor.deltaDecorations([], [
+										{
+											range: new monaco.Range(jsonResponse.line, jsonResponse.column, jsonResponse.line, jsonResponse.column + 1),
+											options: {
+												isWholeLine: true,
+												className: 'bg-red-200',
+												glyphMarginClassName: 'bg-red-200'
+											}
+										}
+									]);
+									evt.detail.target.innerHTML = `Error at line ${jsonResponse.line}, column ${jsonResponse.column}: ${jsonResponse.message}`;
+								}
+							} catch (e) {
+								// If it's not JSON, it's probably the PDF
+								var blob = new Blob([response], { type: 'application/pdf' });
+								var url = URL.createObjectURL(blob);
+								evt.detail.target.innerHTML = `<embed src="${url}" type="application/pdf" width="100%" height="100%">`;
+							}
+						}
+					});
+				});
+			</script>
+		</body>
+	</html>
+}
