@@ -5,27 +5,26 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"unicode"
 )
 
 type Token int
 
 const (
-	EOF = iota 
+	EOF = iota
 	ILLEGALNEST
-	ILLEGAL 
-	SPACING 
-	TEXTMOD 
-	TEXT 
+	ILLEGAL
+	SPACING
+	TEXTMOD
+	TEXT
 )
 
 var tokens = []string{
-	EOF: 	"EOF",
+	EOF:         "EOF",
 	ILLEGALNEST: "ILLEGALNEST",
-	ILLEGAL: "ILLEGAL",
-	SPACING: "SPACING",
-	TEXTMOD: "TEXTMOD",
-	TEXT: "TEXT",
+	ILLEGAL:     "ILLEGAL",
+	SPACING:     "SPACING",
+	TEXTMOD:     "TEXTMOD",
+	TEXT:        "TEXT",
 }
 
 type Position struct {
@@ -51,7 +50,6 @@ func NewLexer(reader io.Reader) *Lexer {
 
 func (l *Lexer) Lex() (Position, Token, string) {
 	for {
-		l.pos.column++
 		r, _, err := l.reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
@@ -59,6 +57,7 @@ func (l *Lexer) Lex() (Position, Token, string) {
 			}
 			panic(err)
 		}
+		l.pos.column++
 
 		switch r {
 		case '\\':
@@ -68,69 +67,75 @@ func (l *Lexer) Lex() (Position, Token, string) {
 		case '{':
 			startPos := l.pos
 			lit, tok := l.lexText(TEXTMOD)
-			return startPos, tok, lit 
+			if tok == EOF {
+				return startPos, EOF, lit
+			}
+			return startPos, tok, lit
 		case '}':
 			return l.pos, TEXT, "}"
 		case '[':
-			startPos := l.pos 
+			startPos := l.pos
 			lit, tok := l.lexText(SPACING)
+			if tok == EOF {
+				return startPos, EOF, lit
+			}
 			return startPos, tok, lit
 		case ']':
 			return l.pos, TEXT, "]"
 		case ' ':
-			return l.pos, TEXT, "_"
+			return l.pos, SPACING, "_"
 		default:
 			startPos := l.pos
 			l.backup()
 			lit, tok := l.lexText(TEXT)
+			if tok == EOF {
+				return startPos, EOF, lit
+			}
 			return startPos, tok, lit
 		}
 	}
-	
 }
 
-func (l *Lexer) resetPosition() {
-	l.pos.line++
-	l.pos.column = 0
-}
-
-// need to test this
 func (l *Lexer) lexText(tokenType int) (string, Token) {
 	var sb strings.Builder
 	for {
 		r, _, err := l.reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
+				// If we've accumulated any text, return it before EOF
+				if sb.Len() > 0 {
+					return sb.String(), Token(tokenType)
+				}
 				return sb.String(), EOF
 			}
+			panic(err)
 		}
-		l.pos.column++ 
-		if unicode.IsLetter(r) || unicode.IsNumber(r) {
-			sb.WriteRune(r)
+		l.pos.column++
 
-		// TEXT MOD
-		} else if tokenType == TEXTMOD {
+		switch tokenType {
+		case TEXTMOD:
 			if r == '{' {
+				l.backup()
 				return sb.String(), ILLEGALNEST
 			} else if r == '}' {
+				l.backup()
 				return sb.String(), TEXTMOD
 			} else {
 				sb.WriteRune(r)
 			}
-
-		// TEXT
-		} else if tokenType == SPACING {
+		case SPACING:
 			if r == '[' {
-				return sb.String(), ILLEGALNEST 
+				l.backup()
+				return sb.String(), ILLEGALNEST
 			} else if r == ']' {
+				l.backup()
 				return sb.String(), SPACING
 			} else {
 				sb.WriteRune(r)
 			}
-
-		} else if tokenType == TEXT {
-			if unicode.IsSpace(r) {
-				l.backup() // space between one and two doesnt show but after two does (when removed)
+		case TEXT:
+			if r == ' ' || r == '{' || r == '}' || r == '[' || r == ']' {
+				l.backup()
 				return sb.String(), TEXT
 			} else {
 				sb.WriteRune(r)
@@ -139,11 +144,15 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 	}
 }
 
+func (l *Lexer) resetPosition() {
+	l.pos.line++
+	l.pos.column = 0
+}
 func (l *Lexer) backup() {
 	if err := l.reader.UnreadRune(); err != nil {
 		panic(err)
 	}
-	
+
 	l.pos.column--
 }
 
