@@ -13,7 +13,8 @@ const (
 	EOF = iota
 	ILLEGALNEST
 	ILLEGAL
-	SPACING
+	SPACE
+	SPACEMOD
 	TEXTMOD
 	TEXT
 )
@@ -22,7 +23,8 @@ var tokens = []string{
 	EOF:         "EOF",
 	ILLEGALNEST: "ILLEGALNEST",
 	ILLEGAL:     "ILLEGAL",
-	SPACING:     "SPACING",
+	SPACE:     "SPACE",
+	SPACEMOD: "SPACEMOD",
 	TEXTMOD:     "TEXTMOD",
 	TEXT:        "TEXT",
 }
@@ -75,7 +77,7 @@ func (l *Lexer) Lex() (Position, Token, string) {
 			return l.pos, TEXT, "}"
 		case '[':
 			startPos := l.pos
-			lit, tok := l.lexText(SPACING)
+			lit, tok := l.lexText(SPACEMOD)
 			if tok == EOF {
 				return startPos, EOF, lit
 			}
@@ -83,7 +85,7 @@ func (l *Lexer) Lex() (Position, Token, string) {
 		case ']':
 			return l.pos, TEXT, "]"
 		case ' ':
-			return l.pos, SPACING, "_"
+			return l.pos, SPACE, "_"
 		default:
 			startPos := l.pos
 			l.backup()
@@ -118,18 +120,16 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 				l.backup()
 				return sb.String(), ILLEGALNEST
 			} else if r == '}' {
-				l.backup()
 				return sb.String(), TEXTMOD
 			} else {
 				sb.WriteRune(r)
 			}
-		case SPACING:
+		case SPACEMOD:
 			if r == '[' {
 				l.backup()
 				return sb.String(), ILLEGALNEST
 			} else if r == ']' {
-				l.backup()
-				return sb.String(), SPACING
+				return sb.String(), SPACEMOD
 			} else {
 				sb.WriteRune(r)
 			}
@@ -161,8 +161,9 @@ func (l *Lexer) ignoreNext() {
 	// ??
 }
 
+// need to test mods and stuff
 func main() {
-	input := "text {mod}[spacing] second text text what what"
+	input := "text {mod} [spacing]{mod2}[spacing2] text2 "
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 	for {
