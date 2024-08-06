@@ -10,6 +10,8 @@ import (
 	"unicode"
 )
 
+// need size global
+
 type TokenType int
 
 const (
@@ -20,6 +22,7 @@ const (
 	SPACEMOD
 	TEXTMOD
 	TEXT
+	MODFAILED
 )
 
 var tokenTypes = []string{
@@ -30,6 +33,7 @@ var tokenTypes = []string{
 	SPACEMOD:    "SPACEMOD",
 	TEXTMOD:     "TEXTMOD",
 	TEXT:        "TEXT",
+	MODFAILED:   "MODFAILED",
 }
 
 type Position struct {
@@ -44,13 +48,13 @@ type Token struct {
 }
 
 type TokenAttributes struct {
-	Bold        bool
-	Italic      bool
-	Underline   bool
-	BulletChild bool
-	Size        int
-	Error       error
-	ErrorAt     int
+	Error      error
+	Size       int
+	ErrorAt    int
+	Bold       bool
+	Italic     bool
+	Underline  bool
+	Horizontal bool
 }
 
 type Lexer struct {
@@ -140,7 +144,6 @@ func (l *Lexer) lexText(tokenType TokenType) Token {
 				return Token{Type: ILLEGALNEST, Literal: sb.String()}
 			} else if r == '}' {
 				token := HandleTextMod(sb.String())
-
 				return token
 			} else {
 				sb.WriteRune(r)
@@ -150,7 +153,8 @@ func (l *Lexer) lexText(tokenType TokenType) Token {
 				l.backup()
 				return Token{Type: ILLEGALNEST, Literal: sb.String()}
 			} else if r == ']' {
-				return Token{Type: SPACEMOD, Literal: sb.String()}
+				token := HandleSpaceMod(sb.String())
+				return token
 			} else {
 				sb.WriteRune(r)
 			}
@@ -198,12 +202,39 @@ func HandleTextMod(command string) Token {
 				}
 			}
 		default:
-			token.Attributes.Error = fmt.Errorf("error ")
+			token.Attributes.Error = fmt.Errorf(MODFAILED.String())
 		}
 	}
 
 	token.Type = TEXTMOD
 	token.Literal = content
+
+	return token
+}
+
+func HandleSpaceMod(command string) Token {
+	var token Token
+
+	mod, content, err := SplitTextMod(command)
+	if err != nil {
+		token.Attributes.Error = err
+		return token
+	}
+	// need to check if content is a number
+	// prob need to switch
+	size, err := strconv.Atoi(content)
+	if err != nil {
+		token.Attributes.Error = fmt.Errorf(ILLEGAL.String())
+	}
+	token.Attributes.Size = size
+	switch mod {
+	case "H":
+		token.Attributes.Horizontal = true
+	case "V":
+		token.Attributes.Horizontal = false
+	default:
+		token.Attributes.Error = fmt.Errorf(ILLEGAL.String())
+	}
 
 	return token
 }
@@ -246,12 +277,18 @@ func (l *Lexer) backup() {
 	l.pos.column--
 }
 
-func (l *Lexer) ignoreNext() {
-	// ??
-}
+// return unmodified text from first instance of command opening to last
+// func (l *Lexer) ignoreNext() Token {
+// 	var sb strings.Builder
+
+// 	for {
+// 		r, _, err := l.reader.ReadRune()
+
+// 	}
+// }
 
 func main() {
-	input := "text {S:mod} [spacing][spacing2] text2 \n hi"
+	input := "text {S:mod} [H:5][V:10] text2 \n hi"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 	for {
@@ -259,9 +296,13 @@ func main() {
 		if tok.Type == EOF {
 			break
 		} else if tok.Attributes.Error != nil {
-			fmt.Printf("Error: %d \n", tok.Attributes.Error)
+			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Attributes.Error, tok.Literal)
+		} else if tok.Type == TEXTMOD {
+			fmt.Printf("%d:%d | %s | Lit: %s | B: %t | I: %t | U: %t | S: %d \n", pos.line, pos.column, tok.Type, tok.Literal, tok.Attributes.Bold, tok.Attributes.Italic, tok.Attributes.Underline, tok.Attributes.Size)
+		} else if tok.Type == SPACEMOD {
+			fmt.Printf("%d:%d | %s | %t \n", pos.line, pos.column, tok.Type, tok.Attributes.Horizontal)
 		} else {
-			fmt.Printf("%d:%d | %s | %s | \n", pos.line, pos.column, tok.Type, tok.Literal)
+			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
 		}
 	}
 }
