@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
@@ -22,18 +23,20 @@ const (
 	SPACEMOD
 	TEXTMOD
 	TEXT
-	MODFAILED
+	TEXTMODFAILED
+	SPACEMODFAILED
 )
 
 var tokenTypes = []string{
-	EOF:         "EOF",
-	ILLEGALNEST: "ILLEGALNEST",
-	ILLEGAL:     "ILLEGAL",
-	SPACE:       "SPACE",
-	SPACEMOD:    "SPACEMOD",
-	TEXTMOD:     "TEXTMOD",
-	TEXT:        "TEXT",
-	MODFAILED:   "MODFAILED",
+	EOF:            "EOF",
+	ILLEGALNEST:    "ILLEGALNEST",
+	ILLEGAL:        "ILLEGAL",
+	SPACE:          "SPACE",
+	SPACEMOD:       "SPACEMOD",
+	TEXTMOD:        "TEXTMOD",
+	TEXT:           "TEXT",
+	TEXTMODFAILED:  "TEXTMODFAILED",
+	SPACEMODFAILED: "SPACEMODFAILED",
 }
 
 type Position struct {
@@ -54,6 +57,7 @@ type TokenAttributes struct {
 	Bold       bool
 	Italic     bool
 	Underline  bool
+	Center     bool
 	Horizontal bool
 }
 
@@ -131,6 +135,7 @@ func (l *Lexer) lexText(tokenType TokenType) Token {
 				if sb.Len() > 0 {
 					return Token{Type: tokenType, Literal: sb.String()}
 				}
+				fmt.Println("returning EOF token in lexText")
 				return Token{Type: EOF, Literal: sb.String()}
 			}
 			panic(err)
@@ -188,6 +193,8 @@ func HandleTextMod(command string) Token {
 			token.Attributes.Italic = true
 		case part == "U":
 			token.Attributes.Underline = true
+		case part == "C":
+			token.Attributes.Center = true
 		case re.MatchString(part):
 			matches := re.FindStringSubmatch(part)
 			if len(matches) == 3 {
@@ -202,7 +209,7 @@ func HandleTextMod(command string) Token {
 				}
 			}
 		default:
-			token.Attributes.Error = fmt.Errorf(MODFAILED.String())
+			token.Attributes.Error = fmt.Errorf(TEXTMODFAILED.String())
 		}
 	}
 
@@ -214,6 +221,7 @@ func HandleTextMod(command string) Token {
 
 func HandleSpaceMod(command string) Token {
 	var token Token
+	command = RemoveSpaces(command)
 
 	mod, content, err := SplitTextMod(command)
 	if err != nil {
@@ -235,7 +243,7 @@ func HandleSpaceMod(command string) Token {
 	default:
 		token.Attributes.Error = fmt.Errorf(ILLEGAL.String())
 	}
-
+	token.Type = SPACEMOD
 	return token
 }
 
@@ -288,21 +296,28 @@ func (l *Lexer) backup() {
 // }
 
 func main() {
-	input := "text {S:mod} [H:5][V:10] text2 \n hi"
+	input := ""
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
+
+	start := time.Now()
+
 	for {
 		pos, tok := lexer.Lex()
 		if tok.Type == EOF {
+			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
 			break
 		} else if tok.Attributes.Error != nil {
-			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Attributes.Error, tok.Literal)
+			fmt.Printf("%d:%d | fail: %s | %s \n", pos.line, pos.column, tok.Attributes.Error, tok.Literal)
 		} else if tok.Type == TEXTMOD {
 			fmt.Printf("%d:%d | %s | Lit: %s | B: %t | I: %t | U: %t | S: %d \n", pos.line, pos.column, tok.Type, tok.Literal, tok.Attributes.Bold, tok.Attributes.Italic, tok.Attributes.Underline, tok.Attributes.Size)
 		} else if tok.Type == SPACEMOD {
-			fmt.Printf("%d:%d | %s | %t \n", pos.line, pos.column, tok.Type, tok.Attributes.Horizontal)
+			fmt.Printf("%d:%d | %s | Hor: %t | %d \n", pos.line, pos.column, tok.Type, tok.Attributes.Horizontal, tok.Attributes.Size)
 		} else {
 			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
 		}
 	}
+
+	duration := time.Since(start)
+	fmt.Printf("Lexing took %v\n", duration)
 }
