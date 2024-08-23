@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 )
 
 type Token int
@@ -120,6 +121,7 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 				l.backup()
 				return sb.String(), ILLEGALNEST
 			} else if r == '}' {
+				// need to pass to a new function to add to attributes
 				return sb.String(), TEXTMOD
 			} else {
 				sb.WriteRune(r)
@@ -129,6 +131,7 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 				l.backup()
 				return sb.String(), ILLEGALNEST
 			} else if r == ']' {
+				// need to pass to a new function to add to attributes
 				return sb.String(), SPACEMOD
 			} else {
 				sb.WriteRune(r)
@@ -142,6 +145,32 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 			}
 		}
 	}
+}
+
+func RemoveSpaces(input string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			// if the character is a space, drop it
+			return -1
+		}
+		// else keep it in the string
+		return r
+	}, input)
+}
+
+func SplitTextModifier(input string) (string, string, error) {
+	// set index to first occurrence of :
+	index := strings.Index(input, ":")
+
+	// if : is found, split content into two parts based on : location
+	if index != -1 {
+		beginning := input[:index]
+		beginning = RemoveSpaces(beginning)
+		end := input[index+1:]
+		return beginning, end, nil
+	}
+
+	return input, "", fmt.Errorf("command incomplete: no colon")
 }
 
 func (l *Lexer) resetPosition() {
@@ -163,9 +192,11 @@ func (l *Lexer) ignoreNext() {
 
 // need to test mods and stuff
 func main() {
-	input := "text {mod} [spacing]{mod2}[spacing2] text2 "
+	input := "text {mod}\n[[spacing]{mod2}[spacing2] text2 "
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
+	// in the case of some illegal nest or other illegal token, we need to just 
+	// break out of the loop with the location of the error
 	for {
 		pos, tok, lit := lexer.Lex()
 		if tok == EOF {
