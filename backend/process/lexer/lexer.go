@@ -4,30 +4,39 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 	"unicode"
 )
 
-type Token int
+// need size global
+
+type TokenType int
 
 const (
-	EOF = iota
+	EOF TokenType = iota
 	ILLEGALNEST
 	ILLEGAL
 	SPACE
 	SPACEMOD
 	TEXTMOD
 	TEXT
+	TEXTMODFAILED
+	SPACEMODFAILED
 )
 
-var tokens = []string{
-	EOF:         "EOF",
-	ILLEGALNEST: "ILLEGALNEST",
-	ILLEGAL:     "ILLEGAL",
-	SPACE:     "SPACE",
-	SPACEMOD: "SPACEMOD",
-	TEXTMOD:     "TEXTMOD",
-	TEXT:        "TEXT",
+var tokenTypes = []string{
+	EOF:            "EOF",
+	ILLEGALNEST:    "ILLEGALNEST",
+	ILLEGAL:        "ILLEGAL",
+	SPACE:          "SPACE",
+	SPACEMOD:       "SPACEMOD",
+	TEXTMOD:        "TEXTMOD",
+	TEXT:           "TEXT",
+	TEXTMODFAILED:  "TEXTMODFAILED",
+	SPACEMODFAILED: "SPACEMODFAILED",
 }
 
 type Position struct {
@@ -35,13 +44,30 @@ type Position struct {
 	column int
 }
 
+type Token struct {
+	Type       TokenType
+	Literal    string
+	Attributes TokenAttributes
+}
+
+type TokenAttributes struct {
+	Error      error
+	Size       int
+	ErrorAt    int
+	Bold       bool
+	Italic     bool
+	Underline  bool
+	Center     bool
+	Horizontal bool
+}
+
 type Lexer struct {
 	pos    Position
 	reader *bufio.Reader
 }
 
-func (t Token) String() string {
-	return tokens[t]
+func (t TokenType) String() string {
+	return tokenTypes[t]
 }
 
 func NewLexer(reader io.Reader) *Lexer {
@@ -51,12 +77,12 @@ func NewLexer(reader io.Reader) *Lexer {
 	}
 }
 
-func (l *Lexer) Lex() (Position, Token, string) {
+func (l *Lexer) Lex() (Position, Token) {
 	for {
 		r, _, err := l.reader.ReadRune()
 		if err != nil {
 			if err == io.EOF {
-				return l.pos, EOF, ""
+				return l.pos, Token{Type: EOF, Literal: ""}
 			}
 			panic(err)
 		}
@@ -69,37 +95,37 @@ func (l *Lexer) Lex() (Position, Token, string) {
 			l.resetPosition()
 		case '{':
 			startPos := l.pos
-			lit, tok := l.lexText(TEXTMOD)
-			if tok == EOF {
-				return startPos, EOF, lit
+			token := l.lexText(TEXTMOD)
+			if token.Type == EOF {
+				return startPos, token
 			}
-			return startPos, tok, lit
+			return startPos, token
 		case '}':
-			return l.pos, TEXT, "}"
+			return l.pos, Token{Type: TEXT, Literal: "}"}
 		case '[':
 			startPos := l.pos
-			lit, tok := l.lexText(SPACEMOD)
-			if tok == EOF {
-				return startPos, EOF, lit
+			token := l.lexText(SPACEMOD)
+			if token.Type == EOF {
+				return startPos, token
 			}
-			return startPos, tok, lit
+			return startPos, token
 		case ']':
-			return l.pos, TEXT, "]"
+			return l.pos, Token{Type: TEXT, Literal: "]"}
 		case ' ':
-			return l.pos, SPACE, "_"
+			return l.pos, Token{Type: SPACE, Literal: "_"}
 		default:
 			startPos := l.pos
 			l.backup()
-			lit, tok := l.lexText(TEXT)
-			if tok == EOF {
-				return startPos, EOF, lit
+			token := l.lexText(TEXT)
+			if token.Type == EOF {
+				return startPos, token
 			}
-			return startPos, tok, lit
+			return startPos, token
 		}
 	}
 }
 
-func (l *Lexer) lexText(tokenType int) (string, Token) {
+func (l *Lexer) lexText(tokenType TokenType) Token {
 	var sb strings.Builder
 	for {
 		r, _, err := l.reader.ReadRune()
@@ -107,9 +133,10 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 			if err == io.EOF {
 				// If we've accumulated any text, return it before EOF
 				if sb.Len() > 0 {
-					return sb.String(), Token(tokenType)
+					return Token{Type: tokenType, Literal: sb.String()}
 				}
-				return sb.String(), EOF
+				fmt.Println("returning EOF token in lexText")
+				return Token{Type: EOF, Literal: sb.String()}
 			}
 			panic(err)
 		}
@@ -119,27 +146,27 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 		case TEXTMOD:
 			if r == '{' {
 				l.backup()
-				return sb.String(), ILLEGALNEST
+				return Token{Type: ILLEGALNEST, Literal: sb.String()}
 			} else if r == '}' {
-				// need to pass to a new function to add to attributes
-				return sb.String(), TEXTMOD
+				token := HandleTextMod(sb.String())
+				return token
 			} else {
 				sb.WriteRune(r)
 			}
 		case SPACEMOD:
 			if r == '[' {
 				l.backup()
-				return sb.String(), ILLEGALNEST
+				return Token{Type: ILLEGALNEST, Literal: sb.String()}
 			} else if r == ']' {
-				// need to pass to a new function to add to attributes
-				return sb.String(), SPACEMOD
+				token := HandleSpaceMod(sb.String())
+				return token
 			} else {
 				sb.WriteRune(r)
 			}
 		case TEXT:
 			if r == ' ' || r == '{' || r == '}' || r == '[' || r == ']' {
 				l.backup()
-				return sb.String(), TEXT
+				return Token{Type: TEXT, Literal: sb.String()}
 			} else {
 				sb.WriteRune(r)
 			}
@@ -147,18 +174,80 @@ func (l *Lexer) lexText(tokenType int) (string, Token) {
 	}
 }
 
-func RemoveSpaces(input string) string {
-	return strings.Map(func(r rune) rune {
-		if unicode.IsSpace(r) {
-			// if the character is a space, drop it
-			return -1
+func HandleTextMod(command string) Token {
+	var token Token
+
+	mods, content, err := SplitTextMod(command)
+	if err != nil {
+		token.Attributes.Error = err
+		return token
+	}
+	modsSplit := strings.Split(mods, ",")
+	re := regexp.MustCompile(`^([A-Z])(\d+)$`)
+
+	for _, part := range modsSplit {
+		switch {
+		case part == "B":
+			token.Attributes.Bold = true
+		case part == "I":
+			token.Attributes.Italic = true
+		case part == "U":
+			token.Attributes.Underline = true
+		case part == "C":
+			token.Attributes.Center = true
+		case re.MatchString(part):
+			matches := re.FindStringSubmatch(part)
+			if len(matches) == 3 {
+				letter := matches[1]
+				number, err := strconv.Atoi(matches[2])
+				if err != nil {
+					token.Attributes.Error = fmt.Errorf("text mod details cannot compile")
+				} else {
+					if letter == "S" && number > 0 {
+						token.Attributes.Size = number
+					}
+				}
+			}
+		default:
+			token.Attributes.Error = fmt.Errorf(TEXTMODFAILED.String())
 		}
-		// else keep it in the string
-		return r
-	}, input)
+	}
+
+	token.Type = TEXTMOD
+	token.Literal = content
+
+	return token
 }
 
-func SplitTextModifier(input string) (string, string, error) {
+func HandleSpaceMod(command string) Token {
+	var token Token
+	command = RemoveSpaces(command)
+
+	mod, content, err := SplitTextMod(command)
+	if err != nil {
+		token.Attributes.Error = err
+		return token
+	}
+	// need to check if content is a number
+	// prob need to switch
+	size, err := strconv.Atoi(content)
+	if err != nil {
+		token.Attributes.Error = fmt.Errorf(ILLEGAL.String())
+	}
+	token.Attributes.Size = size
+	switch mod {
+	case "H":
+		token.Attributes.Horizontal = true
+	case "V":
+		token.Attributes.Horizontal = false
+	default:
+		token.Attributes.Error = fmt.Errorf(ILLEGAL.String())
+	}
+	token.Type = SPACEMOD
+	return token
+}
+
+func SplitTextMod(input string) (string, string, error) {
 	// set index to first occurrence of :
 	index := strings.Index(input, ":")
 
@@ -173,36 +262,62 @@ func SplitTextModifier(input string) (string, string, error) {
 	return input, "", fmt.Errorf("command incomplete: no colon")
 }
 
+func RemoveSpaces(input string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			// if the character is a space, drop it
+			return -1
+		}
+		// else keep it in the string
+		return r
+	}, input)
+}
+
 func (l *Lexer) resetPosition() {
 	l.pos.line++
 	l.pos.column = 0
 }
+
 func (l *Lexer) backup() {
 	if err := l.reader.UnreadRune(); err != nil {
 		panic(err)
 	}
-
 	l.pos.column--
 }
 
-// maybe just pass some variable into lexText etc that makes it ignore stuff
-func (l *Lexer) ignoreNext() {
-	// ??
-}
+// return unmodified text from first instance of command opening to last
+// func (l *Lexer) ignoreNext() Token {
+// 	var sb strings.Builder
 
-// need to test mods and stuff
+// 	for {
+// 		r, _, err := l.reader.ReadRune()
+
+// 	}
+// }
+
 func main() {
-	input := "text {mod}\n[[spacing]{mod2}[spacing2] text2 "
+	input := ""
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
-	// in the case of some illegal nest or other illegal token, we need to just 
-	// break out of the loop with the location of the error
-	for {
-		pos, tok, lit := lexer.Lex()
-		if tok == EOF {
-			break
-		}
 
-		fmt.Printf("%d:%d | %s | %s | \n", pos.line, pos.column, tok, lit)
+	start := time.Now()
+
+	for {
+		pos, tok := lexer.Lex()
+		if tok.Type == EOF {
+			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
+			break
+		} else if tok.Attributes.Error != nil {
+			fmt.Printf("%d:%d | fail: %s | %s \n", pos.line, pos.column, tok.Attributes.Error, tok.Literal)
+		} else if tok.Type == TEXTMOD {
+			fmt.Printf("%d:%d | %s | Lit: %s | B: %t | I: %t | U: %t | S: %d \n", pos.line, pos.column, tok.Type, tok.Literal, tok.Attributes.Bold, tok.Attributes.Italic, tok.Attributes.Underline, tok.Attributes.Size)
+		} else if tok.Type == SPACEMOD {
+			fmt.Printf("%d:%d | %s | Hor: %t | %d \n", pos.line, pos.column, tok.Type, tok.Attributes.Horizontal, tok.Attributes.Size)
+		} else {
+			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
+		}
 	}
+
+	duration := time.Since(start)
+	fmt.Printf("Lexing took %v\n", duration)
 }
