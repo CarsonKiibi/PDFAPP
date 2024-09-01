@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"regexp"
@@ -9,9 +11,13 @@ import (
 	"strings"
 	"time"
 	"unicode"
+
+	"github.com/jung-kurt/gofpdf"
 )
 
 // need size global
+
+// MAKE THIS AN INTERFACE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! goober
 
 type TokenType int
 
@@ -295,29 +301,124 @@ func (l *Lexer) backup() {
 // 	}
 // }
 
+func GeneratePDF(tokens []Token) ([]byte, error) {
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.AddPage()
+
+	defaultTextSize := 11.0
+	pdf.SetFont("Arial", "", defaultTextSize)
+
+	marginLeft, marginTop, marginRight, marginBottom := pdf.GetMargins()
+	pageWidth, pageHeight := pdf.GetPageSize()
+	lineHeight := defaultTextSize * 0.5
+	maxWidth := pageWidth - marginLeft - marginRight
+	maxHeight := pageHeight - marginTop - marginBottom
+
+	var currentX float64 = marginLeft
+	var currentY float64 = marginTop
+	var setStyle string = ""
+
+	// Function to get the current font size
+	getCurrentFontSize := func() float64 {
+		_, fontSize := pdf.GetFontSize()
+		return fontSize
+	}
+
+	// Function to adjust Y position based on font size
+	adjustY := func() {
+		currentY += getCurrentFontSize() * 0.3 // Approximate adjustment for ascent
+	}
+
+	for _, token := range tokens {
+		switch token.Type {
+		case TEXT, TEXTMOD:
+			if token.Type == TEXTMOD {
+				setStyle = ""
+				if token.Attributes.Bold {
+					setStyle += "B"
+				}
+				if token.Attributes.Italic {
+					setStyle += "I"
+				}
+				if token.Attributes.Underline {
+					setStyle += "U"
+				}
+				if token.Attributes.Size > 0 {
+					pdf.SetFontSize(float64(token.Attributes.Size))
+				}
+				pdf.SetFontStyle(setStyle)
+			}
+
+			words := strings.Split(token.Literal, " ")
+			for _, word := range words {
+				wordWidth := pdf.GetStringWidth(word)
+				if currentX+wordWidth > maxWidth {
+					currentX = marginLeft
+					currentY += lineHeight + getCurrentFontSize()
+					if currentY > maxHeight {
+						pdf.AddPage()
+						currentY = marginTop
+					}
+				}
+				adjustY()
+				pdf.Text(currentX, currentY, word)
+				currentY -= getCurrentFontSize() * 0.3 // Reset Y position
+				currentX += wordWidth + pdf.GetStringWidth(" ")
+			}
+
+		case SPACE:
+			spaceWidth := pdf.GetStringWidth(" ")
+			if currentX+spaceWidth > maxWidth {
+				currentX = marginLeft
+				currentY += lineHeight + getCurrentFontSize()
+				if currentY > maxHeight {
+					pdf.AddPage()
+					currentY = marginTop
+				}
+			} else {
+				currentX += spaceWidth
+			}
+
+		default:
+			fmt.Println("token not recognized")
+		}
+
+		pdf.SetFontSize(defaultTextSize)
+		pdf.SetFontStyle("")
+	}
+
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 func main() {
-	input := ""
+	input := "{B,S24:HI!}"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 
 	start := time.Now()
+	var tokens []Token
 
 	for {
 		pos, tok := lexer.Lex()
 		if tok.Type == EOF {
-			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
 			break
-		} else if tok.Attributes.Error != nil {
-			fmt.Printf("%d:%d | fail: %s | %s \n", pos.line, pos.column, tok.Attributes.Error, tok.Literal)
-		} else if tok.Type == TEXTMOD {
-			fmt.Printf("%d:%d | %s | Lit: %s | B: %t | I: %t | U: %t | S: %d \n", pos.line, pos.column, tok.Type, tok.Literal, tok.Attributes.Bold, tok.Attributes.Italic, tok.Attributes.Underline, tok.Attributes.Size)
-		} else if tok.Type == SPACEMOD {
-			fmt.Printf("%d:%d | %s | Hor: %t | %d \n", pos.line, pos.column, tok.Type, tok.Attributes.Horizontal, tok.Attributes.Size)
-		} else {
-			fmt.Printf("%d:%d | %s | %s \n", pos.line, pos.column, tok.Type, tok.Literal)
 		}
+		tokens = append(tokens, tok)
+		fmt.Println(pos)
 	}
-
+	pdfBytes, err := GeneratePDF(tokens)
+	if err != nil {
+		fmt.Println("FAILED")
+	} else {
+		// Convert PDF bytes to base64
+		base64PDF := base64.StdEncoding.EncodeToString(pdfBytes)
+		fmt.Println(base64PDF)
+	}
 	duration := time.Since(start)
 	fmt.Printf("Lexing took %v\n", duration)
 }
