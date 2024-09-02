@@ -291,6 +291,7 @@ func (l *Lexer) backup() {
 	l.pos.column--
 }
 
+// TODO
 // return unmodified text from first instance of command opening to last
 // func (l *Lexer) ignoreNext() Token {
 // 	var sb strings.Builder
@@ -300,6 +301,13 @@ func (l *Lexer) backup() {
 
 // 	}
 // }
+
+// put character/word/etc in right location based on current line height
+// need to make sure the current line has some max text height, but then we need to know the largest character which might be at the end of the line
+// OMG!!!!
+func findLineStartPos() {
+
+}
 
 func GeneratePDF(tokens []Token) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
@@ -396,7 +404,7 @@ func GeneratePDF(tokens []Token) ([]byte, error) {
 }
 
 func main() {
-	input := "{B,S24:HI!}"
+	input := "{B,S24:HI!} hihihihi"
 	reader := strings.NewReader(input)
 	lexer := NewLexer(reader)
 
