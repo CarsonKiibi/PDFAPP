@@ -50,20 +50,37 @@ type Position struct {
 	column int
 }
 
-type Token struct {
-	Type       TokenType
-	Literal    string
-	Attributes TokenAttributes
+// new token implementation
+
+type Token interface {
+	Type() TokenType
+	Literal() string
 }
 
-type TokenAttributes struct {
-	Error      error
+type BaseToken struct {
+	tokenType TokenType
+	literal   string
+}
+
+func (b BaseToken) Type() TokenType {
+	return b.tokenType
+}
+
+func (b BaseToken) Literal() string {
+	return b.literal
+}
+
+type TextToken struct {
+	BaseToken
+	Bold      bool
+	Italic    bool
+	Underline bool
+	Center    bool
+}
+
+type SpacingToken struct {
+	BaseToken
 	Size       int
-	ErrorAt    int
-	Bold       bool
-	Italic     bool
-	Underline  bool
-	Center     bool
 	Horizontal bool
 }
 
