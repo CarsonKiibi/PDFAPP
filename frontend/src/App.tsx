@@ -6,6 +6,7 @@ import EditHeader from './components/EditHeader';
 import PdfHeader from './components/PdfHeader';
 import TextAreaWithLineNumbers from './components/TextAreaWithLineNumbers';
 import DisplayPDF from './components/DisplayPDF';
+import PDFViewer from './components/PDFViewer';
 
 interface TokenError {
   line: number;
@@ -48,7 +49,7 @@ function App() {
 
         <div className="flex flex-col w-full mx-3 flex-1 overflow-hidden">
           <PdfHeader onCompile={handleCompile} />
-          {showPDF ? <DisplayPDF /> : <div className="doc-container" />}
+          <PDFViewer />
         </div>
       </div>
     </div>

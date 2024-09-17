@@ -305,8 +305,13 @@ func (l *Lexer) backup() {
 // put character/word/etc in right location based on current line height
 // need to make sure the current line has some max text height, but then we need to know the largest character which might be at the end of the line
 // OMG!!!!
-func findLineStartPos() {
 
+// curr is current position
+// pageWidth is width exluding margins
+func findLineStartPos(currX float64, currY float64, pageWidth float64, pageHeight float64) (float64, float64) {
+	
+
+	return 0.0, 0.0
 }
 
 func GeneratePDF(tokens []Token) ([]byte, error) {
